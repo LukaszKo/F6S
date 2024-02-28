@@ -1,42 +1,68 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import { nextTick, onMounted, ref } from 'vue'
+
+import ComposeSection from '@/components/ComposeSection.vue'
+import ConversationArea from '@/components/ConversationArea.vue'
+import AppLoader from '@/components/AppLoader.vue'
+
+import useConversation from '@/composables/useConversation'
+import useUser from '@/composables/useUser'
+
+const { addMessage, conversation, fetchConversation } = useConversation()
+const { currentUser, fetchUser } = useUser()
+
+const conversationArea = ref<{ $el: HTMLElement } | null>(null)
+const fetching = ref(false)
+const newMessage = ref('')
+const apiError = ref('')
+
+async function scrollToBottom() {
+  await nextTick()
+  conversationArea.value?.$el.scrollTo(0, conversationArea.value.$el.scrollHeight)
+}
+
+async function submit() {
+  addMessage({ message: newMessage.value, user: currentUser.value! })
+  newMessage.value = ''
+  scrollToBottom()
+}
+
+onMounted(async () => {
+  try {
+    fetching.value = true
+    apiError.value = ''
+    await fetchUser()
+    await fetchConversation()
+  } catch (error) {
+    apiError.value = error
+  } finally {
+    fetching.value = false
+  }
+})
+</script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="./assets/logo.svg" width="125" height="125" />
-
-    <div class="wrapper"></div>
-  </header>
-
   <main>
-    <TheWelcome />
+    <AppLoader v-if="fetching"></AppLoader>
+    <ConversationArea
+      v-if="conversation && currentUser && !fetching"
+      ref="conversationArea"
+      :conversation="conversation"
+      :currentUserId="currentUser.id"
+    ></ConversationArea>
+    <ComposeSection v-model="newMessage" @submit="submit"></ComposeSection>
+    <p class="error" v-if="apiError">{{ apiError }}</p>
   </main>
 </template>
 
 <style scoped>
-header {
-  line-height: 1.5;
+main {
+  display: grid;
+  gap: 20px;
 }
 
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
-}
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
-
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
+.error {
+  color: red;
+  text-align: center;
 }
 </style>
